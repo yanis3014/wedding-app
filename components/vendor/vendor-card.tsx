@@ -1,14 +1,25 @@
 import { Heart, MapPin, Star } from "lucide-react";
 
 import { cn } from "@/lib/utils";
-import type { MockVendor } from "@/lib/mock-vendors";
 
 type VendorCardProps = {
-  vendor: MockVendor;
+  vendor: {
+    id: string;
+    name: string;
+    category: string;
+    location: string;
+    rating: number;
+    reviewCount: number;
+    price: string | number;
+  };
   className?: string;
 };
 
 export function VendorCard({ vendor, className }: VendorCardProps) {
+  const priceDisplay = typeof vendor.price === "number"
+    ? vendor.price.toLocaleString("fr-FR")
+    : vendor.price;
+
   return (
     <article
       className={cn(
@@ -47,7 +58,7 @@ export function VendorCard({ vendor, className }: VendorCardProps) {
             <span className="truncate">{vendor.location}</span>
           </p>
           <span className="shrink-0 font-medium text-ink">
-            dès {vendor.price.toLocaleString("fr-FR")} DT
+            dès {priceDisplay} DT
           </span>
           <div className="ml-auto flex shrink-0 items-center gap-1 text-ink">
             <Star className="size-3.5 fill-goldSoft text-goldSoft" />

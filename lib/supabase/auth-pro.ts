@@ -7,7 +7,7 @@ export async function requireProAuth() {
   const { data: { user } } = await supabase.auth.getUser()
   
   if (!user) {
-    redirect('/pro/connexion')
+    redirect('/connexion')
   }
   
   // Get prestataire data with validation status
@@ -24,7 +24,7 @@ export async function requireValidatedPro() {
   const { user, prestataireData } = await requireProAuth()
   
   if (!prestataireData) {
-    redirect('/pro/connexion')
+    redirect('/connexion')
   }
   
   if (prestataireData.statut_validation !== 'valide') {

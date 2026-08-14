@@ -67,7 +67,7 @@ export function ProBottomNav() {
   }
 
   // Don't show nav on auth pages
-  if (pathname === "/pro/connexion" || pathname === "/pro/inscription") {
+  if (pathname === "/connexion" || pathname === "/inscription") {
     return null;
   }
 

@@ -1,6 +1,6 @@
 "use client";
 
-import { Check, Clock, Plus, User } from "lucide-react";
+import { Check, Clock, LogOut, Plus, User } from "lucide-react";
 import Link from "next/link";
 import { useState } from "react";
 
@@ -51,7 +51,7 @@ export default function ProfilForm({ prestataireData }: ProfilFormProps) {
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
-    window.location.href = "/pro/connexion";
+    window.location.href = "/connexion";
   };
 
   const isAccountValidated = prestataireData?.statut_validation === "valide";
@@ -230,6 +230,18 @@ export default function ProfilForm({ prestataireData }: ProfilFormProps) {
             >
               {isSaved ? "Profil enregistré !" : "Enregistrer le profil"}
             </Button>
+          </div>
+
+          {/* Logout Link */}
+          <div className="mt-6 text-center">
+            <button
+              type="button"
+              onClick={handleLogout}
+              className="flex items-center justify-center gap-2 text-sm text-ink-muted hover:text-ink"
+            >
+              <LogOut className="size-4" />
+              Se déconnecter
+            </button>
           </div>
         </div>
       </main>

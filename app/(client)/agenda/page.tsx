@@ -1,6 +1,5 @@
 import Link from "next/link";
 
-import { mockClientRequests } from "@/lib/mock-client-requests";
 import { requireAuth } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import AgendaContent from "./agenda-content";
@@ -15,15 +14,23 @@ export default async function AgendaPage() {
     .eq("id", user.id)
     .single();
 
-  const confirmedRequests = mockClientRequests.filter(
-    (req) => req.status === "confirmed"
-  );
-  const totalRequests = mockClientRequests.length;
+  // Load confirmed requests with prestataire join
+  const { data: confirmedRequests } = await supabase
+    .from("demandes")
+    .select(`
+      *,
+      prestataires (nom_entreprise, categorie, ville)
+    `)
+    .eq("client_id", user.id)
+    .eq("statut", "confirme")
+    .order("created_at", { ascending: false });
+
+  const totalRequests = confirmedRequests?.length || 0;
 
   return (
     <AgendaContent 
       clientData={clientData}
-      confirmedRequests={confirmedRequests}
+      confirmedRequests={confirmedRequests || []}
       totalRequests={totalRequests}
     />
   );

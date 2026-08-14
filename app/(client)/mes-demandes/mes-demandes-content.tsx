@@ -1,23 +1,31 @@
+"use client";
+
 import { ArrowRight, Search } from "lucide-react";
+import { useState } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/shared/status-pill";
+import { createClient } from "@/lib/supabase/client";
 
 type MesDemandesContentProps = {
   requests: any[];
 };
 
 export default function MesDemandesContent({ requests }: MesDemandesContentProps) {
+  const supabase = createClient();
+  const [updatingId, setUpdatingId] = useState<string | null>(null);
+
   const getStatusLabel = (status: string, quoteAmount?: number) => {
     switch (status) {
-      case "new":
-      case "pending":
+      case "nouveau":
         return "En attente";
-      case "sent":
+      case "devis_envoye":
         return quoteAmount ? `Devis reçu (${quoteAmount.toLocaleString("fr-FR")} DT)` : "Devis reçu";
-      case "confirmed":
+      case "confirme":
         return "Confirmé";
+      case "refuse":
+        return "Refusé";
       default:
         return status;
     }
@@ -42,7 +50,47 @@ export default function MesDemandesContent({ requests }: MesDemandesContentProps
     return budgetMap[budget] || budget;
   };
 
+  const handleConfirm = async (requestId: string) => {
+    setUpdatingId(requestId);
+    const { error } = await supabase
+      .from("demandes")
+      .update({ statut: "confirme" })
+      .eq("id", requestId);
+
+    if (error) {
+      console.error("Error confirming request:", error);
+    }
+    setUpdatingId(null);
+  };
+
+  const handleReject = async (requestId: string) => {
+    setUpdatingId(requestId);
+    const { error } = await supabase
+      .from("demandes")
+      .update({ statut: "refuse" })
+      .eq("id", requestId);
+
+    if (error) {
+      console.error("Error rejecting request:", error);
+    }
+    setUpdatingId(null);
+  };
+
   const isEmpty = requests.length === 0;
+
+  // Map real Supabase data to component expectations
+  const mappedRequests = requests.map((request) => ({
+    id: request.id,
+    prestataireId: request.prestataire_id,
+    vendorName: request.prestataires?.nom_entreprise || "Prestataire",
+    vendorCategory: request.prestataires?.categorie || "Service",
+    sentDate: request.created_at,
+    weddingDate: request.date_mariage,
+    budget: request.budget,
+    status: request.statut,
+    quoteAmount: request.devis_montant,
+    message: request.message,
+  }));
 
   return (
     <div className="flex min-h-screen flex-col bg-porcelain">
@@ -82,37 +130,57 @@ export default function MesDemandesContent({ requests }: MesDemandesContentProps
         ) : (
           /* Requests List */
           <div className="space-y-4">
-            {requests.map((request) => (
-              <Link
+            {mappedRequests.map((request) => (
+              <div
                 key={request.id}
-                href={`/prestataire/${request.vendorId}`}
-                className="block"
+                className="rounded-2xl border border-black/10 bg-card p-5 sm:p-6"
               >
-                <div className="rounded-2xl border border-black/10 bg-card p-5 transition-colors hover:bg-porcelain/30 sm:p-6">
-                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <h3 className="font-heading text-lg font-medium text-ink">
-                        {request.vendorName}
-                      </h3>
-                      <p className="mt-1 text-sm text-ink-muted">
-                        {request.vendorCategory}
-                      </p>
-                    </div>
-                    <StatusPill
-                      variant={request.status}
-                      label={getStatusLabel(request.status, request.quoteAmount)}
-                    />
+                <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <h3 className="font-heading text-lg font-medium text-ink">
+                      {request.vendorName}
+                    </h3>
+                    <p className="mt-1 text-sm text-ink-muted">
+                      {request.vendorCategory}
+                    </p>
                   </div>
-
-                  <div className="flex flex-col gap-2 text-sm text-ink-muted sm:flex-row sm:gap-4">
-                    <span>Envoyé le {formatDate(request.sentDate)}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span>Date mariage : {formatDate(request.weddingDate)}</span>
-                    <span className="hidden sm:inline">•</span>
-                    <span>Budget : {formatBudget(request.budget)}</span>
-                  </div>
+                  <StatusPill
+                    variant={request.status === "nouveau" ? "new" : request.status === "devis_envoye" ? "sent" : request.status === "confirme" ? "confirmed" : "refuse"}
+                    label={getStatusLabel(request.status, request.quoteAmount)}
+                  />
                 </div>
-              </Link>
+
+                <div className="mb-4 flex flex-col gap-2 text-sm text-ink-muted sm:flex-row sm:gap-4">
+                  <span>Envoyé le {formatDate(request.sentDate)}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span>Date mariage : {formatDate(request.weddingDate)}</span>
+                  <span className="hidden sm:inline">•</span>
+                  <span>Budget : {formatBudget(request.budget)}</span>
+                </div>
+
+                {/* Confirm/Reject buttons for devis_envoye */}
+                {request.status === "devis_envoye" && (
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleConfirm(request.id)}
+                      disabled={updatingId === request.id}
+                      size="sm"
+                      className="h-9 rounded-lg bg-henna px-4 hover:bg-henna/90 disabled:bg-henna/30 disabled:cursor-not-allowed"
+                    >
+                      {updatingId === request.id ? "Confirmation..." : "Confirmer"}
+                    </Button>
+                    <Button
+                      onClick={() => handleReject(request.id)}
+                      disabled={updatingId === request.id}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-lg border-black/10 px-4 hover:bg-porcelain/60 disabled:cursor-not-allowed"
+                    >
+                      {updatingId === request.id ? "Rejet..." : "Refuser"}
+                    </Button>
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

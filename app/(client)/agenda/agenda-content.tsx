@@ -1,7 +1,5 @@
 import Link from "next/link";
 
-import { mockClientRequests } from "@/lib/mock-client-requests";
-
 type AgendaContentProps = {
   clientData: any;
   confirmedRequests: any[];
@@ -18,16 +16,15 @@ export default function AgendaContent({ clientData, confirmedRequests, totalRequ
     });
   };
 
-  const getVendorLocation = (vendorId: string) => {
-    // In a real app, you would fetch this from the vendor data
-    const locationMap: Record<string, string> = {
-      "1": "Lyon",
-      "2": "Bordeaux",
-      "3": "Paris",
-      "4": "Aix-en-Provence",
-    };
-    return locationMap[vendorId] || "";
-  };
+  // Map real Supabase data to component expectations
+  const mappedRequests = confirmedRequests.map((request) => ({
+    id: request.id,
+    prestataireId: request.prestataire_id,
+    vendorName: request.prestataires?.nom_entreprise || "Prestataire",
+    vendorCategory: request.prestataires?.categorie || "Service",
+    vendorLocation: request.prestataires?.ville || "",
+    quoteAmount: request.devis_montant,
+  }));
 
   return (
     <div className="flex min-h-screen flex-col bg-porcelain">
@@ -80,7 +77,7 @@ export default function AgendaContent({ clientData, confirmedRequests, totalRequ
             </h2>
 
             <div className="space-y-4">
-              {confirmedRequests.map((request, index) => (
+              {mappedRequests.map((request, index) => (
                 <div
                   key={request.id}
                   className="relative pl-8"
@@ -91,7 +88,7 @@ export default function AgendaContent({ clientData, confirmedRequests, totalRequ
                   </div>
 
                   {/* Timeline line (except for last item) */}
-                  {index < confirmedRequests.length - 1 && (
+                  {index < mappedRequests.length - 1 && (
                     <div className="absolute left-[5px] top-7 h-full w-0.5 bg-sage/30" />
                   )}
 
@@ -113,9 +110,9 @@ export default function AgendaContent({ clientData, confirmedRequests, totalRequ
                       )}
                     </div>
 
-                    {getVendorLocation(request.vendorId) && (
+                    {request.vendorLocation && (
                       <p className="text-sm text-ink-muted">
-                        {getVendorLocation(request.vendorId)}
+                        {request.vendorLocation}
                       </p>
                     )}
                   </div>

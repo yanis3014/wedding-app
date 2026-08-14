@@ -1,8 +1,20 @@
 import { requireAuth } from "@/lib/supabase/auth";
-import { mockClientRequests } from "@/lib/mock-client-requests";
+import { createClient } from "@/lib/supabase/server";
 import MesDemandesContent from "./mes-demandes-content";
 
 export default async function MesDemandesPage() {
-  await requireAuth();
-  return <MesDemandesContent requests={mockClientRequests} />;
+  const user = await requireAuth();
+  const supabase = await createClient();
+
+  // Load requests with prestataire join
+  const { data: requests } = await supabase
+    .from("demandes")
+    .select(`
+      *,
+      prestataires (nom_entreprise, categorie)
+    `)
+    .eq("client_id", user.id)
+    .order("created_at", { ascending: false });
+
+  return <MesDemandesContent requests={requests || []} />;
 }
