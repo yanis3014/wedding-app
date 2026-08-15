@@ -140,7 +140,10 @@ export default function PrestataireDetail({ vendor, reviews }: PrestataireDetail
           <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-ink-muted sm:mt-4 sm:text-base">
             <div className="flex items-center gap-1.5">
               <MapPin className="size-4 shrink-0" />
-              <span>{vendor.ville}</span>
+              <span>
+                {vendor.zones?.nom ? `${vendor.zones.nom}, ` : ""}
+                {vendor.villes?.nom || "Non localisé"}
+              </span>
             </div>
             <div className="flex items-center gap-1.5">
               <Star className="size-4 fill-goldSoft text-goldSoft" />

@@ -20,9 +20,9 @@ export async function middleware(request: NextRequest) {
     }
   )
 
-  const { data: { session } } = await supabase.auth.getSession()
-  const role = session?.user?.user_metadata?.role
-  const userId = session?.user?.id
+  const { data: { user } } = await supabase.auth.getUser()
+  const role = user?.user_metadata?.role
+  const userId = user?.id
 
   const path = request.nextUrl.pathname
 
@@ -50,24 +50,41 @@ export async function middleware(request: NextRequest) {
 
   // AUTH PAGES (/connexion, /inscription)
   if (path === '/connexion' || path === '/inscription') {
-    if (session) {
+    if (user) {
       if (role === 'client') {
         return redirect('/')
       } else if (role === 'prestataire') {
         return redirect('/pro/dashboard')
+      } else if (role === 'admin') {
+        return redirect('/admin/dashboard')
       }
     }
+    return NextResponse.next()
+  }
+
+  // ADMIN PROTECTED ROUTES (/admin/...)
+  if (path.startsWith('/admin')) {
+    if (!user) {
+      return redirect('/connexion')
+    }
+    
+    // Only admins can access admin routes
+    if (role !== 'admin') {
+      return redirect('/')
+    }
+    
     return NextResponse.next()
   }
 
   // CLIENT PROTECTED ROUTES (/mes-demandes, /agenda, /avis, /profil)
   const clientRoutes = ['/mes-demandes', '/agenda', '/avis', '/profil']
   if (clientRoutes.some(route => path.startsWith(route))) {
-    if (!session) {
+    if (!user) {
       return redirect('/connexion')
     }
     
-    if (role === 'prestataire') {
+    // If role is not explicitly 'client', redirect to appropriate pro page
+    if (role !== 'client') {
       return redirect('/pro/dashboard')
     }
     
@@ -77,11 +94,12 @@ export async function middleware(request: NextRequest) {
   // PRESTATAIRE PROTECTED ROUTES (/pro/dashboard, /pro/profil, /pro/avis)
   const prestataireRoutes = ['/pro/dashboard', '/pro/profil', '/pro/avis']
   if (prestataireRoutes.some(route => path.startsWith(route))) {
-    if (!session) {
+    if (!user) {
       return redirect('/connexion')
     }
     
-    if (role === 'client') {
+    // If role is not explicitly 'prestataire', redirect to client home
+    if (role !== 'prestataire') {
       return redirect('/')
     }
     

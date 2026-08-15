@@ -10,27 +10,37 @@ import { SiteHeader } from "@/components/shared/site-header";
 
 type HomePageContentProps = {
   prestataires: any[];
+  villes: any[];
 };
 
-export default function HomePageContent({ prestataires }: HomePageContentProps) {
+export default function HomePageContent({ prestataires, villes }: HomePageContentProps) {
   const [selectedCategory, setSelectedCategory] = useState<string>("all");
+  const [selectedVille, setSelectedVille] = useState<string>("");
 
   const categories = ["all", ...Array.from(new Set(prestataires.map((p) => p.categorie)))];
 
-  const filteredVendors = selectedCategory === "all"
-    ? prestataires
-    : prestataires.filter((p) => p.categorie === selectedCategory);
+  const filteredVendors = prestataires.filter((p) => {
+    const categoryMatch = selectedCategory === "all" || p.categorie === selectedCategory;
+    const villeMatch = !selectedVille || p.villes?.id === selectedVille;
+    return categoryMatch && villeMatch;
+  });
 
   // Transform Supabase data to match VendorCard interface
-  const vendorCards = filteredVendors.map((p) => ({
-    id: p.id,
-    name: p.nom_entreprise,
-    category: p.categorie,
-    location: p.ville,
-    rating: 4.5, // Default rating for now
-    reviewCount: 0, // Will be calculated from avis table later
-    price: p.tarif_indicatif || "Sur devis",
-  }));
+  const vendorCards = filteredVendors.map((p) => {
+    const villeName = p.villes?.nom || "Non localisé";
+    const zoneName = p.zones?.nom;
+    const location = zoneName ? `${zoneName}, ${villeName}` : villeName;
+    
+    return {
+      id: p.id,
+      name: p.nom_entreprise,
+      category: p.categorie,
+      location: location,
+      rating: 4.5, // Default rating for now
+      reviewCount: 0, // Will be calculated from avis table later
+      price: p.tarif_indicatif || "Sur devis",
+    };
+  });
 
   return (
     <div className="flex flex-1 flex-col">
@@ -63,11 +73,18 @@ export default function HomePageContent({ prestataires }: HomePageContentProps) 
                 className="h-11 w-full rounded-xl bg-porcelain/60 pl-10 pr-4 text-sm text-ink placeholder:text-ink-muted/70 outline-none ring-henna/30 focus:ring-2"
               />
             </div>
-            <input
-              type="text"
-              placeholder="Ville ou département"
-              className="h-11 rounded-xl bg-porcelain/60 px-4 text-sm text-ink placeholder:text-ink-muted/70 outline-none ring-henna/30 focus:ring-2 sm:w-48"
-            />
+            <select
+              value={selectedVille}
+              onChange={(e) => setSelectedVille(e.target.value)}
+              className="h-11 rounded-xl bg-porcelain/60 px-4 text-sm text-ink outline-none ring-henna/30 focus:ring-2 sm:w-48"
+            >
+              <option value="">Toutes les villes</option>
+              {villes.map((ville) => (
+                <option key={ville.id} value={ville.id}>
+                  {ville.nom}
+                </option>
+              ))}
+            </select>
             <Button
               type="submit"
               size="lg"

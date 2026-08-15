@@ -7,7 +7,11 @@ export default async function PrestatairePage({ params }: { params: { id: string
   // Load vendor data
   const { data: vendor } = await supabase
     .from("prestataires")
-    .select("*")
+    .select(`
+      *,
+      villes!inner (nom, latitude, longitude),
+      zones (nom)
+    `)
     .eq("id", params.id)
     .eq("statut_validation", "valide")
     .single();

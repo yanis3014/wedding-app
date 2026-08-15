@@ -59,6 +59,9 @@ export default function ConnexionPage() {
           } else {
             setIsRejected(true);
           }
+        } else if (role === "admin") {
+          // Redirect to admin dashboard
+          router.push("/admin/dashboard");
         } else {
           // No role found, redirect to home
           router.push("/");

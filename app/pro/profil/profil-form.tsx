@@ -9,9 +9,10 @@ import { createClient } from "@/lib/supabase/client";
 
 type ProfilFormProps = {
   prestataireData: any;
+  tarifMensuel: number | null;
 };
 
-export default function ProfilForm({ prestataireData }: ProfilFormProps) {
+export default function ProfilForm({ prestataireData, tarifMensuel }: ProfilFormProps) {
   const supabase = createClient();
   
   const [formData, setFormData] = useState({
@@ -113,6 +114,46 @@ export default function ProfilForm({ prestataireData }: ProfilFormProps) {
             </div>
           </div>
         </div>
+
+        {/* Subscription Status */}
+        {prestataireData?.abonnement_statut && (
+          <div className="mb-6 rounded-xl border border-black/10 bg-card p-4">
+            {prestataireData.abonnement_statut === "essai" && (
+              <div className="flex flex-col gap-1">
+                <p className="text-sm font-medium text-goldSoft">
+                  Essai gratuit jusqu'au{" "}
+                  {prestataireData.essai_fin_date
+                    ? new Date(prestataireData.essai_fin_date).toLocaleDateString("fr-FR", {
+                        day: "numeric",
+                        month: "long",
+                        year: "numeric",
+                      })
+                    : "-"}
+                </p>
+                {tarifMensuel && (
+                  <p className="text-xs text-ink-muted">
+                    Tarif à l'issue de l'essai : {tarifMensuel} DT/mois
+                  </p>
+                )}
+              </div>
+            )}
+            {prestataireData.abonnement_statut === "actif" && (
+              <p className="text-sm font-medium text-sage">
+                Abonnement actif{" "}
+                {tarifMensuel && `— ${tarifMensuel} DT/mois`}
+              </p>
+            )}
+            {(prestataireData.abonnement_statut === "expire" ||
+              prestataireData.abonnement_statut === "suspendu") && (
+              <p className="text-sm font-medium text-henna">
+                {prestataireData.abonnement_statut === "expire"
+                  ? "Abonnement expiré"
+                  : "Abonnement suspendu"}
+                — Contactez l'équipe
+              </p>
+            )}
+          </div>
+        )}
 
         {/* Form */}
         <div className="space-y-6">

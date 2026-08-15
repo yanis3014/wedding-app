@@ -11,9 +11,19 @@ export default async function HomePage() {
 
   const { data: prestataires } = await supabase
     .from("prestataires")
-    .select("*")
+    .select(`
+      *,
+      villes!inner (nom, latitude, longitude),
+      zones (nom)
+    `)
     .eq("statut_validation", "valide")
     .order("created_at", { ascending: false });
 
-  return <HomePageContent prestataires={prestataires || []} />;
+  // Load villes for search filter
+  const { data: villes } = await supabase
+    .from("villes")
+    .select("*")
+    .order("nom");
+
+  return <HomePageContent prestataires={prestataires || []} villes={villes || []} />;
 }

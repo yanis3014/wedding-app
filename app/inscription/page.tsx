@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
 import { createClient } from "@/lib/supabase/client";
@@ -9,6 +9,7 @@ export default function InscriptionPage() {
   const supabase = createClient();
   
   const [role, setRole] = useState<"client" | "prestataire">("client");
+  const [trialMonths, setTrialMonths] = useState<number>(3);
   const [clientFormData, setClientFormData] = useState({
     firstName: "",
     lastName: "",
@@ -18,13 +19,45 @@ export default function InscriptionPage() {
   const [prestataireFormData, setPrestataireFormData] = useState({
     companyName: "",
     category: "",
-    city: "",
+    ville_id: "",
+    zone_id: "",
     email: "",
     password: "",
   });
+  const [villes, setVilles] = useState<any[]>([]);
+  const [zones, setZones] = useState<any[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+
+  // Load villes on mount
+  useEffect(() => {
+    const loadVilles = async () => {
+      const { data } = await supabase
+        .from("villes")
+        .select("*")
+        .order("nom");
+      if (data) setVilles(data);
+    };
+    loadVilles();
+  }, [supabase]);
+
+  // Load zones when a ville is selected
+  useEffect(() => {
+    if (prestataireFormData.ville_id) {
+      const loadZones = async () => {
+        const { data } = await supabase
+          .from("zones")
+          .select("*")
+          .eq("ville_id", prestataireFormData.ville_id)
+          .order("nom");
+        if (data) setZones(data);
+      };
+      loadZones();
+    } else {
+      setZones([]);
+    }
+  }, [prestataireFormData.ville_id, supabase]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -74,6 +107,24 @@ export default function InscriptionPage() {
           // Redirect to home page
           window.location.href = "/";
         } else {
+          // Read configuration for trial duration
+          const { data: config } = await supabase
+            .from("configuration")
+            .select("duree_essai_mois")
+            .eq("id", 1)
+            .single();
+
+          const trialMonths = config?.duree_essai_mois || 3;
+          const trialEndDate = new Date();
+          trialEndDate.setMonth(trialEndDate.getMonth() + trialMonths);
+
+          // Get ville data for coordinates
+          const { data: villeData } = await supabase
+            .from("villes")
+            .select("latitude, longitude")
+            .eq("id", prestataireFormData.ville_id)
+            .single();
+
           // Create the prestataire record
           const { error: dbError } = await supabase
             .from("prestataires")
@@ -81,12 +132,17 @@ export default function InscriptionPage() {
               id: authData.user.id,
               nom_entreprise: prestataireFormData.companyName,
               categorie: prestataireFormData.category,
-              ville: prestataireFormData.city,
+              ville_id: prestataireFormData.ville_id,
+              zone_id: prestataireFormData.zone_id || null,
               telephone: null,
               tarif_indicatif: null,
               description: null,
               zone_intervention: null,
               statut_validation: "en_attente",
+              abonnement_statut: "essai",
+              essai_fin_date: trialEndDate.toISOString(),
+              latitude: villeData?.latitude || null,
+              longitude: villeData?.longitude || null,
             });
 
           if (dbError) {
@@ -95,6 +151,7 @@ export default function InscriptionPage() {
           }
 
           setIsSuccess(true);
+          setTrialMonths(trialMonths);
         }
       }
     } catch (err) {
@@ -130,6 +187,9 @@ export default function InscriptionPage() {
             <p className="mt-4 text-sm text-ink-muted sm:text-base">
               Votre compte est en cours de validation, vous recevrez une
               confirmation sous 24-48h.
+            </p>
+            <p className="mt-3 text-sm text-goldSoft sm:text-base">
+              Vous bénéficiez de {trialMonths} mois d'essai gratuit à partir de votre validation. Le tarif de votre abonnement vous sera communiqué prochainement.
             </p>
             <a
               href="/connexion"
@@ -273,22 +333,58 @@ export default function InscriptionPage() {
 
               <div>
                 <label
-                  htmlFor="city"
+                  htmlFor="ville"
                   className="mb-1.5 block text-sm font-medium text-ink"
                 >
                   Ville
                 </label>
-                <input
-                  type="text"
-                  id="city"
-                  value={prestataireFormData.city}
-                  onChange={(e) =>
-                    setPrestataireFormData({ ...prestataireFormData, city: e.target.value })
-                  }
+                <select
+                  id="ville"
+                  value={prestataireFormData.ville_id}
+                  onChange={(e) => {
+                    setPrestataireFormData({ 
+                      ...prestataireFormData, 
+                      ville_id: e.target.value,
+                      zone_id: "" // Reset zone when ville changes
+                    });
+                  }}
                   required
-                  className="h-10 w-full rounded-lg border border-black/10 bg-porcelain/60 px-3 text-sm text-ink placeholder:text-ink-muted/70 outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
-                />
+                  className="h-10 w-full rounded-lg border border-black/10 bg-porcelain/60 px-3 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
+                >
+                  <option value="">Sélectionnez une ville</option>
+                  {villes.map((ville) => (
+                    <option key={ville.id} value={ville.id}>
+                      {ville.nom}
+                    </option>
+                  ))}
+                </select>
               </div>
+
+              {prestataireFormData.ville_id && (
+                <div>
+                  <label
+                    htmlFor="zone"
+                    className="mb-1.5 block text-sm font-medium text-ink"
+                  >
+                    Zone (optionnel)
+                  </label>
+                  <select
+                    id="zone"
+                    value={prestataireFormData.zone_id}
+                    onChange={(e) =>
+                      setPrestataireFormData({ ...prestataireFormData, zone_id: e.target.value })
+                    }
+                    className="h-10 w-full rounded-lg border border-black/10 bg-porcelain/60 px-3 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
+                  >
+                    <option value="">Sélectionnez une zone</option>
+                    {zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.nom}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
             </>
           )}
 
