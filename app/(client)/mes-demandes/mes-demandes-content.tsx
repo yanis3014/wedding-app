@@ -1,11 +1,12 @@
 "use client";
 
 import { ArrowRight, Search } from "lucide-react";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/shared/status-pill";
+import { MessagingModal } from "@/components/shared/messaging-modal";
 import { createClient } from "@/lib/supabase/client";
 
 type MesDemandesContentProps = {
@@ -15,6 +16,35 @@ type MesDemandesContentProps = {
 export default function MesDemandesContent({ requests }: MesDemandesContentProps) {
   const supabase = createClient();
   const [updatingId, setUpdatingId] = useState<string | null>(null);
+  const [localRequests, setLocalRequests] = useState(requests);
+  const [isMessagingModalOpen, setIsMessagingModalOpen] = useState(false);
+  const [selectedRequest, setSelectedRequest] = useState<any>(null);
+  const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
+
+  // Load message counts for each request
+  useEffect(() => {
+    const loadMessageCounts = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const counts: Record<string, number> = {};
+      for (const request of localRequests) {
+        const { data, error } = await supabase
+          .from("messages")
+          .select("id")
+          .eq("demande_id", request.id);
+        
+        if (!error && data) {
+          counts[request.id] = data.length;
+        }
+      }
+      setMessageCounts(counts);
+    };
+
+    if (localRequests.length > 0) {
+      loadMessageCounts();
+    }
+  }, [localRequests, supabase]);
 
   const getStatusLabel = (status: string, quoteAmount?: number) => {
     switch (status) {
@@ -58,7 +88,14 @@ export default function MesDemandesContent({ requests }: MesDemandesContentProps
       .eq("id", requestId);
 
     if (error) {
-      console.error("Error confirming request:", error);
+      alert(`Erreur lors de la confirmation: ${error.message}`);
+    } else {
+      // Update local state to reflect the change immediately
+      setLocalRequests(prev => 
+        prev.map(req => 
+          req.id === requestId ? { ...req, statut: "confirme" } : req
+        )
+      );
     }
     setUpdatingId(null);
   };
@@ -71,15 +108,32 @@ export default function MesDemandesContent({ requests }: MesDemandesContentProps
       .eq("id", requestId);
 
     if (error) {
-      console.error("Error rejecting request:", error);
+      alert(`Erreur lors du refus: ${error.message}`);
+    } else {
+      // Update local state to reflect the change immediately
+      setLocalRequests(prev => 
+        prev.map(req => 
+          req.id === requestId ? { ...req, statut: "refuse" } : req
+        )
+      );
     }
     setUpdatingId(null);
   };
 
-  const isEmpty = requests.length === 0;
+  const handleOpenMessagingModal = (request: any) => {
+    setSelectedRequest(request);
+    setIsMessagingModalOpen(true);
+  };
+
+  const handleCloseMessagingModal = () => {
+    setIsMessagingModalOpen(false);
+    setSelectedRequest(null);
+  };
+
+  const isEmpty = localRequests.length === 0;
 
   // Map real Supabase data to component expectations
-  const mappedRequests = requests.map((request) => ({
+  const mappedRequests = localRequests.map((request) => ({
     id: request.id,
     prestataireId: request.prestataire_id,
     vendorName: request.prestataires?.nom_entreprise || "Prestataire",
@@ -180,11 +234,39 @@ export default function MesDemandesContent({ requests }: MesDemandesContentProps
                     </Button>
                   </div>
                 )}
+
+                {/* View conversation button for confirmed requests */}
+                {request.status === "confirme" && (
+                  <div className="flex items-center gap-2">
+                    {messageCounts[request.id] > 0 && (
+                      <span className="flex size-2 items-center justify-center rounded-full bg-henna text-[10px] text-white">
+                        {messageCounts[request.id]}
+                      </span>
+                    )}
+                    <Button
+                      onClick={() => handleOpenMessagingModal(request)}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-lg border-black/10 px-4 hover:bg-porcelain/60"
+                    >
+                      Voir la conversation
+                    </Button>
+                  </div>
+                )}
               </div>
             ))}
           </div>
         )}
       </main>
+
+      {/* Messaging Modal */}
+      <MessagingModal
+        isOpen={isMessagingModalOpen}
+        onClose={handleCloseMessagingModal}
+        request={selectedRequest}
+        userRole="client"
+        prestataireName={selectedRequest ? selectedRequest.vendorName : undefined}
+      />
     </div>
   );
 }

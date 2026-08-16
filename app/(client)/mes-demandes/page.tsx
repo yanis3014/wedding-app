@@ -2,6 +2,8 @@ import { requireAuth } from "@/lib/supabase/auth";
 import { createClient } from "@/lib/supabase/server";
 import MesDemandesContent from "./mes-demandes-content";
 
+export const dynamic = 'force-dynamic';
+
 export default async function MesDemandesPage() {
   const user = await requireAuth();
   const supabase = await createClient();

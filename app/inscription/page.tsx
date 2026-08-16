@@ -3,6 +3,7 @@
 import { useState, useEffect } from "react";
 
 import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 
 export default function InscriptionPage() {
@@ -33,10 +34,11 @@ export default function InscriptionPage() {
   // Load villes on mount
   useEffect(() => {
     const loadVilles = async () => {
-      const { data } = await supabase
+      const { data, error } = await supabase
         .from("villes")
         .select("*")
         .order("nom");
+      console.log("Villes fetch result:", { data, error });
       if (data) setVilles(data);
     };
     loadVilles();
@@ -118,13 +120,6 @@ export default function InscriptionPage() {
           const trialEndDate = new Date();
           trialEndDate.setMonth(trialEndDate.getMonth() + trialMonths);
 
-          // Get ville data for coordinates
-          const { data: villeData } = await supabase
-            .from("villes")
-            .select("latitude, longitude")
-            .eq("id", prestataireFormData.ville_id)
-            .single();
-
           // Create the prestataire record
           const { error: dbError } = await supabase
             .from("prestataires")
@@ -141,12 +136,11 @@ export default function InscriptionPage() {
               statut_validation: "en_attente",
               abonnement_statut: "essai",
               essai_fin_date: trialEndDate.toISOString(),
-              latitude: villeData?.latitude || null,
-              longitude: villeData?.longitude || null,
             });
 
           if (dbError) {
-            setError("Erreur lors de la création du profil. Veuillez réessayer.");
+            console.error("Prestataire insert error:", dbError);
+            setError(`Erreur lors de la création du profil: ${dbError.message}`);
             return;
           }
 
@@ -312,23 +306,26 @@ export default function InscriptionPage() {
                 >
                   Catégorie
                 </label>
-                <select
-                  id="category"
-                  value={prestataireFormData.category}
-                  onChange={(e) =>
-                    setPrestataireFormData({ ...prestataireFormData, category: e.target.value })
-                  }
-                  required
-                  className="h-10 w-full rounded-lg border border-black/10 bg-porcelain/60 px-3 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
-                >
-                  <option value="">Sélectionnez une catégorie</option>
-                  <option value="Photographe">Photographe</option>
-                  <option value="Traiteur">Traiteur</option>
-                  <option value="Salle des fêtes">Salle des fêtes</option>
-                  <option value="DJ/Musique">DJ/Musique</option>
-                  <option value="Fleuriste">Fleuriste</option>
-                  <option value="Traditionnel">Traditionnel</option>
-                </select>
+                <div className="relative">
+                  <select
+                    id="category"
+                    value={prestataireFormData.category}
+                    onChange={(e) =>
+                      setPrestataireFormData({ ...prestataireFormData, category: e.target.value })
+                    }
+                    required
+                    className="h-10 w-full appearance-none rounded-lg border border-black/10 bg-porcelain/60 px-3 pr-10 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
+                  >
+                    <option value="">Sélectionnez une catégorie</option>
+                    <option value="Photographe">Photographe</option>
+                    <option value="Traiteur">Traiteur</option>
+                    <option value="Salle des fêtes">Salle des fêtes</option>
+                    <option value="DJ/Musique">DJ/Musique</option>
+                    <option value="Fleuriste">Fleuriste</option>
+                    <option value="Traditionnel">Traditionnel</option>
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
+                </div>
               </div>
 
               <div>
@@ -338,26 +335,29 @@ export default function InscriptionPage() {
                 >
                   Ville
                 </label>
-                <select
-                  id="ville"
-                  value={prestataireFormData.ville_id}
-                  onChange={(e) => {
-                    setPrestataireFormData({ 
-                      ...prestataireFormData, 
-                      ville_id: e.target.value,
-                      zone_id: "" // Reset zone when ville changes
-                    });
-                  }}
-                  required
-                  className="h-10 w-full rounded-lg border border-black/10 bg-porcelain/60 px-3 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
-                >
-                  <option value="">Sélectionnez une ville</option>
-                  {villes.map((ville) => (
-                    <option key={ville.id} value={ville.id}>
-                      {ville.nom}
-                    </option>
-                  ))}
-                </select>
+                <div className="relative">
+                  <select
+                    id="ville"
+                    value={prestataireFormData.ville_id}
+                    onChange={(e) => {
+                      setPrestataireFormData({ 
+                        ...prestataireFormData, 
+                        ville_id: e.target.value,
+                        zone_id: "" // Reset zone when ville changes
+                      });
+                    }}
+                    required
+                    className="h-10 w-full appearance-none rounded-lg border border-black/10 bg-porcelain/60 px-3 pr-10 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
+                  >
+                    <option value="">Sélectionnez une ville</option>
+                    {villes.map((ville) => (
+                      <option key={ville.id} value={ville.id}>
+                        {ville.nom}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
+                </div>
               </div>
 
               {prestataireFormData.ville_id && (
@@ -368,21 +368,24 @@ export default function InscriptionPage() {
                   >
                     Zone (optionnel)
                   </label>
-                  <select
-                    id="zone"
-                    value={prestataireFormData.zone_id}
-                    onChange={(e) =>
-                      setPrestataireFormData({ ...prestataireFormData, zone_id: e.target.value })
-                    }
-                    className="h-10 w-full rounded-lg border border-black/10 bg-porcelain/60 px-3 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
-                  >
-                    <option value="">Sélectionnez une zone</option>
-                    {zones.map((zone) => (
-                      <option key={zone.id} value={zone.id}>
-                        {zone.nom}
-                      </option>
-                    ))}
-                  </select>
+                  <div className="relative">
+                    <select
+                      id="zone"
+                      value={prestataireFormData.zone_id}
+                      onChange={(e) =>
+                        setPrestataireFormData({ ...prestataireFormData, zone_id: e.target.value })
+                      }
+                      className="h-10 w-full appearance-none rounded-lg border border-black/10 bg-porcelain/60 px-3 pr-10 text-sm text-ink outline-none ring-henna/30 focus:border-henna/50 focus:ring-2"
+                    >
+                      <option value="">Sélectionnez une zone</option>
+                      {zones.map((zone) => (
+                        <option key={zone.id} value={zone.id}>
+                          {zone.nom}
+                        </option>
+                      ))}
+                    </select>
+                    <ChevronDown className="pointer-events-none absolute right-3 top-1/2 size-4 -translate-y-1/2 text-ink-muted" />
+                  </div>
                 </div>
               )}
             </>

@@ -10,12 +10,16 @@ export async function requireProAuth() {
     redirect('/connexion')
   }
   
-  // Get prestataire data with validation status
-  const { data: prestataireData } = await supabase
+  // Get prestataire data with all necessary columns
+  const { data: prestataireData, error } = await supabase
     .from('prestataires')
-    .select('statut_validation, nom_entreprise')
+    .select('*')
     .eq('id', user.id)
     .single()
+  
+  if (error) {
+    console.error('Error loading prestataire data in requireProAuth:', error)
+  }
   
   return { user, prestataireData }
 }

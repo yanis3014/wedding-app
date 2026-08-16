@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import L from "leaflet";
 import "leaflet/dist/leaflet.css";
 
@@ -8,73 +8,83 @@ type PrestatairesMapProps = {
   prestataires: any[];
 };
 
-// Fix for default marker icons in Leaflet with Next.js
-delete (L.Icon.Default.prototype as any)._getIconUrl;
-L.Icon.Default.mergeOptions({
-  iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
-  iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
-  shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
-});
-
 export default function PrestatairesMap({ prestataires }: PrestatairesMapProps) {
   const [map, setMap] = useState<L.Map | null>(null);
-  const [mapInitialized, setMapInitialized] = useState(false);
+  const [mapReady, setMapReady] = useState(false);
+  const markersRef = useRef<L.Marker[]>([]);
 
   useEffect(() => {
-    if (!mapInitialized && typeof window !== "undefined") {
-      // Initialize map centered on Sousse
-      const mapInstance = L.map("map").setView([35.8256, 10.6084], 10);
+    if (typeof window === "undefined") return;
 
-      // Add OpenStreetMap tiles
-      L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
-        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
-      }).addTo(mapInstance);
+    // Initialize map centered on Sousse
+    const mapInstance = L.map("map").setView([35.8256, 10.6084], 10);
 
+    // Fix for default marker icons in Leaflet with Next.js
+    delete (L.Icon.Default.prototype as any)._getIconUrl;
+    L.Icon.Default.mergeOptions({
+      iconRetinaUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+      iconUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+      shadowUrl: "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+    });
+
+    // Add OpenStreetMap tiles
+    L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+      attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors',
+    }).addTo(mapInstance);
+
+    // Wait for map to be fully initialized
+    mapInstance.whenReady(() => {
       setMap(mapInstance);
-      setMapInitialized(true);
+      setMapReady(true);
+    });
 
-      return () => {
-        mapInstance.remove();
-      };
-    }
-  }, [mapInitialized]);
+    // Cleanup function
+    return () => {
+      // Clear all markers
+      markersRef.current.forEach((marker) => marker.remove());
+      markersRef.current = [];
+      // Remove map instance
+      mapInstance.remove();
+      setMap(null);
+      setMapReady(false);
+    };
+  }, []); // Empty dependency array - only run once on mount
 
   useEffect(() => {
-    if (map && prestataires.length > 0) {
-      // Clear existing markers
-      map.eachLayer((layer) => {
-        if (layer instanceof L.Marker) {
-          map.removeLayer(layer);
-        }
-      });
+    if (!mapReady || !map) return;
 
-      // Add markers for prestataires with coordinates
-      prestataires.forEach((prestataire) => {
-        // Use villes table data (new format) or fallback to direct latitude/longitude (old format)
-        const lat = prestataire.villes?.latitude || prestataire.latitude;
-        const lng = prestataire.villes?.longitude || prestataire.longitude;
+    // Clear existing markers
+    markersRef.current.forEach((marker) => marker.remove());
+    markersRef.current = [];
+
+    // Add markers for prestataires with coordinates
+    prestataires.forEach((prestataire) => {
+      // Use villes table data (new format) or fallback to direct latitude/longitude (old format)
+      const lat = prestataire.villes?.latitude || prestataire.latitude;
+      const lng = prestataire.villes?.longitude || prestataire.longitude;
+      
+      if (lat && lng) {
+        const isValide = prestataire.statut_validation === "valide";
+        const isPending = prestataire.statut_validation === "en_attente";
+
+        // Create custom colored marker
+        const markerColor = isValide ? "#4A7C59" : isPending ? "#D4A574" : "#8B5A2B";
         
-        if (lat && lng) {
-          const isValide = prestataire.statut_validation === "valide";
-          const isPending = prestataire.statut_validation === "en_attente";
+        const customIcon = L.divIcon({
+          className: "custom-marker",
+          html: `<div style="
+            background-color: ${markerColor};
+            width: 24px;
+            height: 24px;
+            border-radius: 50%;
+            border: 3px solid white;
+            box-shadow: 0 2px 4px rgba(0,0,0,0.3);
+          "></div>`,
+          iconSize: [24, 24],
+          iconAnchor: [12, 12],
+        });
 
-          // Create custom colored marker
-          const markerColor = isValide ? "#4A7C59" : isPending ? "#D4A574" : "#8B5A2B";
-          
-          const customIcon = L.divIcon({
-            className: "custom-marker",
-            html: `<div style="
-              background-color: ${markerColor};
-              width: 24px;
-              height: 24px;
-              border-radius: 50%;
-              border: 3px solid white;
-              box-shadow: 0 2px 4px rgba(0,0,0,0.3);
-            "></div>`,
-            iconSize: [24, 24],
-            iconAnchor: [12, 12],
-          });
-
+        try {
           const marker = L.marker([lat, lng], { icon: customIcon }).addTo(map);
 
           // Create popup content
@@ -99,10 +109,13 @@ export default function PrestatairesMap({ prestataires }: PrestatairesMapProps) 
           `;
 
           marker.bindPopup(popupContent);
+          markersRef.current.push(marker);
+        } catch (error) {
+          console.error("Error adding marker to map:", error);
         }
-      });
-    }
-  }, [map, prestataires]);
+      }
+    });
+  }, [mapReady, map, prestataires]);
 
   return (
     <div

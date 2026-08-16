@@ -31,6 +31,8 @@ export default function PrestataireDetail({ vendor, reviews }: PrestataireDetail
   const [isSubmitted, setIsSubmitted] = useState(false);
   const [isClient, setIsClient] = useState(false);
   const [isCheckingRole, setIsCheckingRole] = useState(true);
+  const [portfolioPhotos, setPortfolioPhotos] = useState<any[]>([]);
+  const [tarifs, setTarifs] = useState<any[]>([]);
 
   useEffect(() => {
     const checkUserRole = async () => {
@@ -48,6 +50,44 @@ export default function PrestataireDetail({ vendor, reviews }: PrestataireDetail
 
     checkUserRole();
   }, [isAuthenticated, supabase]);
+
+  // Load portfolio photos
+  useEffect(() => {
+    const loadPortfolio = async () => {
+      const { data, error } = await supabase
+        .from("portfolio_photos")
+        .select("*")
+        .eq("prestataire_id", vendor.id)
+        .order("ordre", { ascending: true });
+
+      if (error) {
+        console.error("Error loading portfolio:", error);
+      } else {
+        setPortfolioPhotos(data || []);
+      }
+    };
+
+    loadPortfolio();
+  }, [vendor.id, supabase]);
+
+  // Load tarifs
+  useEffect(() => {
+    const loadTarifs = async () => {
+      const { data, error } = await supabase
+        .from("tarifs")
+        .select("*")
+        .eq("prestataire_id", vendor.id)
+        .order("created_at", { ascending: true });
+
+      if (error) {
+        console.error("Error loading tarifs:", error);
+      } else {
+        setTarifs(data || []);
+      }
+    };
+
+    loadTarifs();
+  }, [vendor.id, supabase]);
 
   const validateForm = () => {
     const newErrors: Record<string, string> = {};
@@ -101,15 +141,10 @@ export default function PrestataireDetail({ vendor, reviews }: PrestataireDetail
     }
   };
 
-  // Mock portfolio data (will be connected later)
-  const portfolio = [1, 2, 3, 4, 5, 6];
-
-  // Mock pricing data (will be connected later)
-  const pricing = [
-    { name: "Forfait Essentiel", price: 800, description: "Service de base pour les mariages simples" },
-    { name: "Forfait Premium", price: 1500, description: "Service complet avec photos et vidéo" },
-    { name: "Forfait Luxe", price: 2500, description: "Premium avec album et séance engagement" },
-  ];
+  // Calculate average rating from real reviews
+  const averageRating = reviews.length > 0
+    ? reviews.reduce((sum, review) => sum + review.note, 0) / reviews.length
+    : 0;
 
   return (
     <div className="flex min-h-screen flex-col bg-porcelain">
@@ -146,9 +181,15 @@ export default function PrestataireDetail({ vendor, reviews }: PrestataireDetail
               </span>
             </div>
             <div className="flex items-center gap-1.5">
-              <Star className="size-4 fill-goldSoft text-goldSoft" />
-              <span className="font-medium text-ink">4.5</span>
-              <span>({reviews.length} avis)</span>
+              {reviews.length > 0 ? (
+                <>
+                  <Star className="size-4 fill-goldSoft text-goldSoft" />
+                  <span className="font-medium text-ink">{averageRating.toFixed(1)}</span>
+                  <span>({reviews.length} avis)</span>
+                </>
+              ) : (
+                <span className="text-ink-muted">Aucun avis pour le moment</span>
+              )}
             </div>
           </div>
         </div>
@@ -185,13 +226,27 @@ export default function PrestataireDetail({ vendor, reviews }: PrestataireDetail
 
           {/* Portfolio Tab */}
           {activeTab === "portfolio" && (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-              {portfolio.map((item, index) => (
-                <div
-                  key={index}
-                  className="aspect-square rounded-xl bg-gradient-to-br from-rose/20 to-goldSoft/20"
-                />
-              ))}
+            <div>
+              {portfolioPhotos.length === 0 ? (
+                <div className="text-center py-8">
+                  <p className="text-ink-muted">Ce prestataire n'a pas encore ajouté de photos</p>
+                </div>
+              ) : (
+                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                  {portfolioPhotos.map((photo) => (
+                    <div
+                      key={photo.id}
+                      className="aspect-square overflow-hidden rounded-xl"
+                    >
+                      <img
+                        src={photo.url}
+                        alt="Portfolio"
+                        className="size-full object-cover"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
 
@@ -235,23 +290,42 @@ export default function PrestataireDetail({ vendor, reviews }: PrestataireDetail
 
           {/* Pricing Tab */}
           {activeTab === "pricing" && (
-            <div className="space-y-4">
-              {pricing.map((plan, index) => (
-                <div
-                  key={index}
-                  className="rounded-xl border border-black/10 bg-porcelain/50 p-4"
-                >
-                  <div className="mb-2 flex items-center justify-between">
-                    <h3 className="font-heading text-lg font-medium text-ink">
-                      {plan.name}
-                    </h3>
-                    <span className="font-heading text-lg font-medium text-henna">
-                      {plan.price.toLocaleString("fr-FR")} DT
-                    </span>
-                  </div>
-                  <p className="text-sm text-ink-muted">{plan.description}</p>
+            <div>
+              {tarifs.length === 0 ? (
+                <div className="text-center py-8">
+                  {vendor.tarif_indicatif ? (
+                    <div>
+                      <p className="text-ink-muted">Aucun tarif détaillé renseigné</p>
+                      <p className="mt-2 font-heading text-lg font-medium text-henna">
+                        À partir de {vendor.tarif_indicatif}
+                      </p>
+                    </div>
+                  ) : (
+                    <p className="text-ink-muted">Aucun tarif renseigné pour le moment</p>
+                  )}
                 </div>
-              ))}
+              ) : (
+                <div className="space-y-4">
+                  {tarifs.map((tarif) => (
+                    <div
+                      key={tarif.id}
+                      className="rounded-xl border border-black/10 bg-porcelain/50 p-4"
+                    >
+                      <div className="mb-2 flex items-center justify-between">
+                        <h3 className="font-heading text-lg font-medium text-ink">
+                          {tarif.nom}
+                        </h3>
+                        <span className="font-heading text-lg font-medium text-henna">
+                          {tarif.prix.toLocaleString("fr-FR")} DT
+                        </span>
+                      </div>
+                      {tarif.description && (
+                        <p className="text-sm text-ink-muted">{tarif.description}</p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           )}
         </div>

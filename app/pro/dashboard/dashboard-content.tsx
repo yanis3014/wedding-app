@@ -1,16 +1,19 @@
 "use client";
 
-import { Calendar, LogOut, MessageSquare, TrendingUp, X } from "lucide-react";
-import { useState } from "react";
+import { Calendar, LogOut, MessageSquare, TrendingUp, X, Eye } from "lucide-react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 
 import { Button } from "@/components/ui/button";
 import { StatusPill } from "@/components/shared/status-pill";
+import { MessagingModal } from "@/components/shared/messaging-modal";
 import { createClient } from "@/lib/supabase/client";
 
 type DashboardContentProps = {
   vendorName: string;
   requests: any[];
+  appointmentRequests: any[];
+  acceptedAppointments: any[];
   stats: {
     newRequests: number;
     pendingQuotes: number;
@@ -18,11 +21,13 @@ type DashboardContentProps = {
   };
 };
 
-export default function DashboardContent({ vendorName, requests, stats }: DashboardContentProps) {
+export default function DashboardContent({ vendorName, requests, appointmentRequests, acceptedAppointments, stats }: DashboardContentProps) {
   const supabase = createClient();
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [selectedRequest, setSelectedRequest] = useState<any>(null);
   const [quoteAmount, setQuoteAmount] = useState("");
+  const [isMessagingModalOpen, setIsMessagingModalOpen] = useState(false);
+  const [messageCounts, setMessageCounts] = useState<Record<string, number>>({});
 
   const getStatusLabel = (status: string) => {
     switch (status) {
@@ -38,6 +43,31 @@ export default function DashboardContent({ vendorName, requests, stats }: Dashbo
         return status;
     }
   };
+
+  // Load message counts for each request
+  useEffect(() => {
+    const loadMessageCounts = async () => {
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) return;
+
+      const counts: Record<string, number> = {};
+      for (const request of requests) {
+        const { data, error } = await supabase
+          .from("messages")
+          .select("id")
+          .eq("demande_id", request.id);
+        
+        if (!error && data) {
+          counts[request.id] = data.length;
+        }
+      }
+      setMessageCounts(counts);
+    };
+
+    if (requests.length > 0) {
+      loadMessageCounts();
+    }
+  }, [requests, supabase]);
 
   const formatBudget = (budget: string) => {
     const budgetMap: Record<string, string> = {
@@ -68,6 +98,61 @@ export default function DashboardContent({ vendorName, requests, stats }: Dashbo
     setIsModalOpen(false);
     setSelectedRequest(null);
     setQuoteAmount("");
+  };
+
+  const handleOpenMessagingModal = (request: any) => {
+    setSelectedRequest(request);
+    setIsMessagingModalOpen(true);
+  };
+
+  const handleCloseMessagingModal = () => {
+    setIsMessagingModalOpen(false);
+    setSelectedRequest(null);
+  };
+
+  const handleAcceptAppointment = async (appointmentId: string, disponibiliteId: string | null) => {
+    try {
+      // Update appointment status
+      const { error: updateError } = await supabase
+        .from("demandes_rdv")
+        .update({ statut: "accepte" })
+        .eq("id", appointmentId);
+
+      if (updateError) throw updateError;
+
+      // If a disponibilite was selected, mark it as reserved
+      if (disponibiliteId) {
+        const { error: dispoError } = await supabase
+          .from("disponibilites")
+          .update({ statut: "reserve" })
+          .eq("id", disponibiliteId);
+
+        if (dispoError) throw dispoError;
+      }
+
+      // Reload appointment requests
+      window.location.reload();
+    } catch (error) {
+      console.error("Error accepting appointment:", error);
+      alert("Erreur lors de l'acceptation du rendez-vous");
+    }
+  };
+
+  const handleRejectAppointment = async (appointmentId: string) => {
+    try {
+      const { error } = await supabase
+        .from("demandes_rdv")
+        .update({ statut: "refuse" })
+        .eq("id", appointmentId);
+
+      if (error) throw error;
+
+      // Reload appointment requests
+      window.location.reload();
+    } catch (error) {
+      console.error("Error rejecting appointment:", error);
+      alert("Erreur lors du refus du rendez-vous");
+    }
   };
 
   const handleSubmitQuote = async () => {
@@ -106,7 +191,7 @@ export default function DashboardContent({ vendorName, requests, stats }: Dashbo
 
   return (
     <div className="flex min-h-screen flex-col bg-porcelain">
-      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 sm:px-6 sm:py-14">
+      <main className="mx-auto w-full max-w-6xl flex-1 px-4 py-10 pb-28 sm:px-6 sm:py-14 sm:pb-28">
         {/* Header */}
         <div className="mb-10 flex items-start justify-between">
           <div>
@@ -222,7 +307,7 @@ export default function DashboardContent({ vendorName, requests, stats }: Dashbo
                       </div>
                     </div>
                     <StatusPill
-                      variant={request.statut === "nouveau" ? "new" : request.statut === "devis_envoye" ? "sent" : request.statut}
+                      variant={request.statut === "nouveau" ? "new" : request.statut === "devis_envoye" ? "sent" : request.statut === "confirme" ? "confirmed" : request.statut === "refuse" ? "refuse" : "pending"}
                       label={getStatusLabel(request.statut)}
                     />
                   </div>
@@ -241,13 +326,21 @@ export default function DashboardContent({ vendorName, requests, stats }: Dashbo
                         Répondre
                       </Button>
                     ) : (
-                      <Button
-                        variant="outline"
-                        size="sm"
-                        className="h-9 rounded-lg border-black/10 px-4 hover:bg-porcelain/60"
-                      >
-                        Voir l'échange
-                      </Button>
+                      <div className="flex items-center gap-2">
+                        {messageCounts[request.id] > 0 && (
+                          <span className="flex size-2 items-center justify-center rounded-full bg-henna text-[10px] text-white">
+                            {messageCounts[request.id]}
+                          </span>
+                        )}
+                        <Button
+                          onClick={() => handleOpenMessagingModal(request)}
+                          variant="outline"
+                          size="sm"
+                          className="h-9 rounded-lg border-black/10 px-4 hover:bg-porcelain/60"
+                        >
+                          Voir l'échange
+                        </Button>
+                      </div>
                     )}
                   </div>
                 </div>
@@ -255,6 +348,128 @@ export default function DashboardContent({ vendorName, requests, stats }: Dashbo
             )}
           </div>
         </div>
+
+        {/* Appointment Requests */}
+        {appointmentRequests.length > 0 && (
+          <div className="mt-10">
+            <h2 className="font-heading text-2xl font-medium text-ink sm:text-3xl">
+              Demandes de rendez-vous
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted sm:text-base">
+              Répondez aux demandes de rendez-vous
+            </p>
+
+            <div className="mt-6 space-y-4">
+              {appointmentRequests.map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="rounded-2xl border border-black/10 bg-card p-5 sm:p-6"
+                >
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="font-heading text-lg font-medium text-ink">
+                        {appointment.titre}
+                      </h3>
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {appointment.clients?.prenom || "Client"}
+                      </p>
+                    </div>
+                    <StatusPill
+                      variant="pending"
+                      label="En attente"
+                    />
+                  </div>
+
+                  <div className="mb-4 flex flex-col gap-2 text-sm text-ink-muted sm:flex-row sm:gap-4">
+                    <span>Date : {new Date(appointment.date_rdv).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span>Heure : {appointment.heure_rdv}</span>
+                    {appointment.lieu && (
+                      <>
+                        <span className="hidden sm:inline">•</span>
+                        <span>Lieu : {appointment.lieu}</span>
+                      </>
+                    )}
+                  </div>
+
+                  <div className="flex gap-3">
+                    <Button
+                      onClick={() => handleAcceptAppointment(appointment.id, appointment.disponibilite_id)}
+                      size="sm"
+                      className="h-9 rounded-lg bg-henna px-4 hover:bg-henna/90"
+                    >
+                      Accepter
+                    </Button>
+                    <Button
+                      onClick={() => handleRejectAppointment(appointment.id)}
+                      variant="outline"
+                      size="sm"
+                      className="h-9 rounded-lg border-black/10 px-4 hover:bg-porcelain/60"
+                    >
+                      Refuser
+                    </Button>
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+
+        {/* Accepted Appointments */}
+        {acceptedAppointments.length > 0 && (
+          <div className="mt-10">
+            <h2 className="font-heading text-2xl font-medium text-ink sm:text-3xl">
+              Mes prochains rendez-vous
+            </h2>
+            <p className="mt-1 text-sm text-ink-muted sm:text-base">
+              Vos rendez-vous confirmés
+            </p>
+
+            <div className="mt-6 space-y-4">
+              {acceptedAppointments.map((appointment) => (
+                <div
+                  key={appointment.id}
+                  className="rounded-2xl border border-black/10 bg-card p-5 sm:p-6"
+                >
+                  <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                    <div>
+                      <h3 className="font-heading text-lg font-medium text-ink">
+                        {appointment.titre}
+                      </h3>
+                      <p className="mt-1 text-sm text-ink-muted">
+                        {appointment.clients?.prenom || "Client"}
+                      </p>
+                    </div>
+                    <StatusPill
+                      variant="confirmed"
+                      label="Confirmé"
+                    />
+                  </div>
+
+                  <div className="mb-4 flex flex-col gap-2 text-sm text-ink-muted sm:flex-row sm:gap-4">
+                    <span>Date : {new Date(appointment.date_rdv).toLocaleDateString("fr-FR", {
+                      day: "numeric",
+                      month: "long",
+                      year: "numeric",
+                    })}</span>
+                    <span className="hidden sm:inline">•</span>
+                    <span>Heure : {appointment.heure_rdv}</span>
+                    {appointment.lieu && (
+                      <>
+                        <span className="hidden sm:inline">•</span>
+                        <span>Lieu : {appointment.lieu}</span>
+                      </>
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </main>
 
       {/* Quote Response Modal */}
@@ -319,6 +534,15 @@ export default function DashboardContent({ vendorName, requests, stats }: Dashbo
           </div>
         </div>
       )}
+
+      {/* Messaging Modal */}
+      <MessagingModal
+        isOpen={isMessagingModalOpen}
+        onClose={handleCloseMessagingModal}
+        request={selectedRequest}
+        userRole="prestataire"
+        clientName={selectedRequest ? getClientName(selectedRequest) : undefined}
+      />
     </div>
   );
 }

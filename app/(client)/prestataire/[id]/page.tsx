@@ -1,7 +1,12 @@
 import { createClient } from "@/lib/supabase/server";
 import PrestataireDetail from "./prestataire-detail";
 
-export default async function PrestatairePage({ params }: { params: { id: string } }) {
+export default async function PrestatairePage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
   const supabase = await createClient();
 
   // Load vendor data
@@ -12,7 +17,7 @@ export default async function PrestatairePage({ params }: { params: { id: string
       villes!inner (nom, latitude, longitude),
       zones (nom)
     `)
-    .eq("id", params.id)
+    .eq("id", id)
     .eq("statut_validation", "valide")
     .single();
 
@@ -27,7 +32,7 @@ export default async function PrestatairePage({ params }: { params: { id: string
       *,
       clients (prenom)
     `)
-    .eq("prestataire_id", params.id)
+    .eq("prestataire_id", id)
     .order("created_at", { ascending: false });
 
   return (

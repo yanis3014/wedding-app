@@ -3,10 +3,11 @@ import Link from "next/link";
 type AgendaContentProps = {
   clientData: any;
   confirmedRequests: any[];
+  acceptedAppointments: any[];
   totalRequests: number;
 };
 
-export default function AgendaContent({ clientData, confirmedRequests, totalRequests }: AgendaContentProps) {
+export default function AgendaContent({ clientData, confirmedRequests, acceptedAppointments, totalRequests }: AgendaContentProps) {
   const formatWeddingDate = (dateString: string) => {
     if (!dateString) return "Date non définie";
     return new Date(dateString).toLocaleDateString("fr-FR", {
@@ -119,6 +120,67 @@ export default function AgendaContent({ clientData, confirmedRequests, totalRequ
                 </div>
               ))}
             </div>
+
+            {/* Appointments Section */}
+            {acceptedAppointments.length > 0 && (
+              <div className="mt-8 space-y-6">
+                <h2 className="font-heading text-xl font-medium text-ink sm:text-2xl">
+                  Rendez-vous
+                </h2>
+
+                <div className="space-y-4">
+                  {acceptedAppointments.map((appointment, index) => (
+                    <div
+                      key={appointment.id}
+                      className="relative pl-8"
+                    >
+                      {/* Timeline dot */}
+                      <div className="absolute left-0 top-3 flex size-4 shrink-0 items-center justify-center">
+                        <div className="size-3 rounded-full bg-henna" />
+                      </div>
+
+                      {/* Timeline line (except for last item) */}
+                      {index < acceptedAppointments.length - 1 && (
+                        <div className="absolute left-[5px] top-7 h-full w-0.5 bg-henna/30" />
+                      )}
+
+                      {/* Content */}
+                      <div className="rounded-xl border border-black/10 bg-card p-4 sm:p-5">
+                        <div className="mb-2 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+                          <div>
+                            <p className="text-[11px] font-medium uppercase tracking-widest text-henna sm:text-xs">
+                              {appointment.prestataires?.categorie || "Rendez-vous"}
+                            </p>
+                            <h3 className="font-heading text-lg font-medium text-ink sm:text-xl">
+                              {appointment.titre}
+                            </h3>
+                          </div>
+                          <p className="text-sm font-medium text-ink-muted sm:text-base">
+                            {new Date(appointment.date_rdv).toLocaleDateString("fr-FR", {
+                              day: "numeric",
+                              month: "long",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+
+                        <div className="flex flex-col gap-1 text-sm text-ink-muted sm:flex-row sm:gap-4">
+                          <span>Heure : {appointment.heure_rdv}</span>
+                          {appointment.lieu && (
+                            <>
+                              <span className="hidden sm:inline">•</span>
+                              <span>Lieu : {appointment.lieu}</span>
+                            </>
+                          )}
+                          <span className="hidden sm:inline">•</span>
+                          <span>{appointment.prestataires?.nom_entreprise || "Prestataire"}</span>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
 
             {/* Encouraging message */}
             <div className="rounded-xl bg-sage/10 p-4 text-center">

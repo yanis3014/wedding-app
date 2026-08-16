@@ -4,6 +4,8 @@ import { requireValidatedPro } from "@/lib/supabase/auth-pro";
 import { createClient } from "@/lib/supabase/server";
 import DashboardContent from "./dashboard-content";
 
+export const dynamic = 'force-dynamic';
+
 export default async function PrestataireDashboardPage() {
   const { prestataireData, isValid, user } = await requireValidatedPro();
   const supabase = await createClient();
@@ -21,7 +23,7 @@ export default async function PrestataireDashboardPage() {
 
     return (
       <div className="flex min-h-screen flex-col bg-porcelain">
-        <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10 sm:px-6 sm:py-14">
+        <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-10 pb-28 sm:px-6 sm:py-14 sm:pb-28">
           <div className="text-center">
             <div className="mb-6 flex size-20 items-center justify-center rounded-full bg-porcelain/60 mx-auto">
               <Calendar className="size-10 text-ink-muted" />
@@ -56,6 +58,28 @@ export default async function PrestataireDashboardPage() {
     .eq("prestataire_id", user.id)
     .order("created_at", { ascending: false });
 
+  // Load appointment requests with client join
+  const { data: appointmentRequests } = await supabase
+    .from("demandes_rdv")
+    .select(`
+      *,
+      clients (prenom, nom)
+    `)
+    .eq("prestataire_id", user.id)
+    .eq("statut", "en_attente")
+    .order("created_at", { ascending: false });
+
+  // Load accepted appointments with client join
+  const { data: acceptedAppointments } = await supabase
+    .from("demandes_rdv")
+    .select(`
+      *,
+      clients (prenom, nom)
+    `)
+    .eq("prestataire_id", user.id)
+    .eq("statut", "accepte")
+    .order("date_rdv", { ascending: true });
+
   // Calculate stats
   const newRequests = requests?.filter((r) => r.statut === "nouveau").length || 0;
   const pendingQuotes = requests?.filter((r) => r.statut === "devis_envoye").length || 0;
@@ -68,6 +92,8 @@ export default async function PrestataireDashboardPage() {
     <DashboardContent 
       vendorName={vendorName}
       requests={requests || []}
+      appointmentRequests={appointmentRequests || []}
+      acceptedAppointments={acceptedAppointments || []}
       stats={{ newRequests, pendingQuotes, responseRate }}
     />
   );

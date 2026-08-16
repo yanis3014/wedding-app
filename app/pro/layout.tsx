@@ -6,7 +6,7 @@ export default function ProLayout({
   children: React.ReactNode;
 }) {
   return (
-    <div className="min-h-screen pb-24">
+    <div className="min-h-screen pb-20 sm:pb-24">
       {children}
       <ProBottomNav />
     </div>
