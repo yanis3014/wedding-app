@@ -158,7 +158,7 @@ export default function AvisForm({ vendorsWithReviewStatus }: AvisFormProps) {
                     <div className="space-y-6">
                       {reviewableVendors.map(({ request, prestataire, hasReview, review }) => {
                         const currentReview = reviews[request.id] || { rating: 0, comment: "" };
-                        const isPublishing = isPublishing[request.id];
+                        const isCurrentlyPublishing = isPublishing[request.id];
 
                         return (
                           <div
@@ -230,11 +230,11 @@ export default function AvisForm({ vendorsWithReviewStatus }: AvisFormProps) {
 
                                 <Button
                                   onClick={() => handlePublish(request.id, prestataire.id)}
-                                  disabled={currentReview.rating === 0 || !currentReview.comment.trim() || isPublishing}
+                                  disabled={currentReview.rating === 0 || !currentReview.comment.trim() || isCurrentlyPublishing}
                                   size="lg"
                                   className="h-11 w-full rounded-xl bg-henna px-6 hover:bg-henna/90 disabled:bg-henna/30 disabled:cursor-not-allowed"
                                 >
-                                  {isPublishing ? "Publication en cours..." : "Publier l'avis"}
+                                  {isCurrentlyPublishing ? "Publication en cours..." : "Publier l'avis"}
                                 </Button>
                               </div>
                             )}
